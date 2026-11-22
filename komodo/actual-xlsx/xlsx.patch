@@ -1,0 +1,1948 @@
+diff --git a/packages/desktop-client/e2e/accounts.test.ts b/packages/desktop-client/e2e/accounts.test.ts
+index 3034eef10e2164a8f4bff312d00c866907974506..25254cf8437c8cb50480d7d680d9c7acd1fe3d3c 100644
+--- a/packages/desktop-client/e2e/accounts.test.ts
++++ b/packages/desktop-client/e2e/accounts.test.ts
+@@ -320,6 +320,104 @@ test.describe('Accounts', () => {
+       await expect(importButton).not.toBeVisible();
+     }
+ 
++    test('imports an XLSX workbook with header detection and required-column filtering', async () => {
++      const fileChooserPromise = page.waitForEvent('filechooser');
++      await accountPage.page.getByRole('button', { name: 'Import' }).click();
++      const fileChooser = await fileChooserPromise;
++      await fileChooser.setFiles(join(__dirname, 'data/xlsx-import.xlsx'));
++
++      const dialog = page.getByRole('dialog');
++      await expect(dialog.getByText('Checking', { exact: true })).toBeVisible();
++      await expect(dialog.getByLabel('Header row:')).toHaveAttribute(
++        'placeholder',
++        '3',
++      );
++      await dialog
++        .getByRole('checkbox', { name: 'Amount', exact: true })
++        .check();
++      await expect(
++        dialog.getByText(/Rows excluded for missing values: 1/),
++      ).toBeVisible();
++      await dialog
++        .getByRole('button', { name: 'Import 2 transactions', exact: true })
++        .click();
++      await expect(dialog).not.toBeVisible();
++      await expect(
++        accountPage.transactionTableRow.filter({ hasText: 'Sample Grocer' }),
++      ).toContainText('42.50');
++      await expect(
++        accountPage.transactionTableRow.filter({ hasText: 'Sample Employer' }),
++      ).toContainText('2,500.00');
++      await expect(
++        accountPage.transactionTableRow.filter({ hasText: 'Missing amount' }),
++      ).toHaveCount(0);
++    });
++
++    test('recovers from an invalid XLSX worksheet and clears empty previews', async () => {
++      const fileChooserPromise = page.waitForEvent('filechooser');
++      await accountPage.page.getByRole('button', { name: 'Import' }).click();
++      const fileChooser = await fileChooserPromise;
++      await fileChooser.setFiles(
++        join(__dirname, 'data/xlsx-worksheet-recovery.xlsx'),
++      );
++
++      const dialog = page.getByRole('dialog');
++      await expect(
++        dialog.getByText(
++          'Select a worksheet with at most 256 columns and 10,000 data rows.',
++        ),
++      ).toBeVisible();
++      await dialog.getByLabel('Worksheet:').click();
++      await page
++        .getByRole('menu')
++        .getByRole('button', { name: 'Transactions', exact: true })
++        .click();
++      const importButton = dialog.getByRole('button', {
++        name: 'Import 1 transactions',
++        exact: true,
++      });
++      await expect(importButton).toBeEnabled();
++      await expect(
++        dialog.getByText('Recovery Shop', { exact: true }),
++      ).toBeVisible();
++
++      await dialog
++        .getByRole('checkbox', { name: 'Reference', exact: true })
++        .check();
++      await expect(
++        dialog.getByText(/Rows excluded for missing values: 1/),
++      ).toBeVisible();
++      await expect(
++        dialog.getByText('Recovery Shop', { exact: true }),
++      ).not.toBeVisible();
++      await expect(
++        dialog.getByRole('button', {
++          name: 'Import 0 transactions',
++          exact: true,
++        }),
++      ).toBeDisabled();
++
++      await dialog
++        .getByRole('checkbox', { name: 'Reference', exact: true })
++        .uncheck();
++      await expect(importButton).toBeEnabled();
++      await dialog.getByLabel('Worksheet:').click();
++      await page
++        .getByRole('menu')
++        .getByRole('button', { name: 'Empty', exact: true })
++        .click();
++      await expect(dialog.getByText('No transactions found')).toBeVisible();
++      await expect(
++        dialog.getByText('Recovery Shop', { exact: true }),
++      ).not.toBeVisible();
++      await expect(
++        dialog.getByRole('button', {
++          name: 'Import 0 transactions',
++          exact: true,
++        }),
++      ).toBeDisabled();
++    });
++
+     test('imports transactions from a CSV file', async () => {
+       await importCsv(true);
+     });
+diff --git a/packages/desktop-client/e2e/data/xlsx-import.xlsx b/packages/desktop-client/e2e/data/xlsx-import.xlsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..58aab3bb518d6e9b7d95ec56d2979e1a0455c442
+GIT binary patch
+literal 17720
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/packages/desktop-client/e2e/data/xlsx-worksheet-recovery.xlsx b/packages/desktop-client/e2e/data/xlsx-worksheet-recovery.xlsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..95d0a2ca4067feca5ec844f852f19a283cb17ae9
+GIT binary patch
+literal 27358
+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
+DI>8l;
+
+literal 0
+HcmV?d00001
+
+diff --git a/packages/desktop-client/src/components/accounts/Account.tsx b/packages/desktop-client/src/components/accounts/Account.tsx
+index 077bbe5ee6af0a5cf79a81e837ef72dbf2691277..18de0956db9d93fe9e68182311297c9f808f4495 100644
+--- a/packages/desktop-client/src/components/accounts/Account.tsx
++++ b/packages/desktop-client/src/components/accounts/Account.tsx
+@@ -624,7 +624,7 @@ class AccountInternal extends PureComponent<
+         filters: [
+           {
+             name: t('Financial files'),
+-            extensions: ['qif', 'ofx', 'qfx', 'csv', 'tsv', 'xml'],
++            extensions: ['qif', 'ofx', 'qfx', 'csv', 'tsv', 'xml', 'xlsx'],
+           },
+         ],
+       });
+diff --git a/packages/desktop-client/src/components/modals/ImportTransactionsModal/FieldMappings.tsx b/packages/desktop-client/src/components/modals/ImportTransactionsModal/FieldMappings.tsx
+index 4dc59a1a430217251d40c73442b223a88cd1d625..aa2dea10e8c043ae0f4381eedaea69483b40d880 100644
+--- a/packages/desktop-client/src/components/modals/ImportTransactionsModal/FieldMappings.tsx
++++ b/packages/desktop-client/src/components/modals/ImportTransactionsModal/FieldMappings.tsx
+@@ -12,6 +12,7 @@ import { stripCsvImportTransaction } from './utils';
+ import type { FieldMapping, ImportTransaction } from './utils';
+ 
+ type FieldMappingsProps = {
++  title?: string;
+   transactions: ImportTransaction[];
+   mappings?: FieldMapping;
+   onChange: (field: keyof FieldMapping, newValue: string) => void;
+@@ -21,6 +22,7 @@ type FieldMappingsProps = {
+ };
+ 
+ export function FieldMappings({
++  title,
+   transactions,
+   mappings = {
+     date: null,
+@@ -47,7 +49,7 @@ export function FieldMappings({
+ 
+   return (
+     <View>
+-      <SectionLabel title={t('CSV FIELDS')} />
++      <SectionLabel title={title ?? t('CSV FIELDS')} />
+       <SpaceBetween gap={10} style={{ marginTop: 5, alignItems: 'flex-start' }}>
+         <View style={{ flex: 1 }}>
+           <SubLabel title={t('Date')} />
+diff --git a/packages/desktop-client/src/components/modals/ImportTransactionsModal/ImportTransactionsModal.tsx b/packages/desktop-client/src/components/modals/ImportTransactionsModal/ImportTransactionsModal.tsx
+index b1d59d279f91bcc4f793dfb0e9ceed354a883e27..470daf083f3e6ad641d5b24701aa7dbed7a8454f 100644
+--- a/packages/desktop-client/src/components/modals/ImportTransactionsModal/ImportTransactionsModal.tsx
++++ b/packages/desktop-client/src/components/modals/ImportTransactionsModal/ImportTransactionsModal.tsx
+@@ -24,6 +24,10 @@ import { theme } from '@actual-app/components/theme';
+ import { View } from '@actual-app/components/view';
+ import { send } from '@actual-app/core/platform/client/connection';
+ import type { ParseFileOptions } from '@actual-app/core/server/transactions/import/parse-file';
++import type {
++  XlsxImportMetadata,
++  XlsxImportOptions,
++} from '@actual-app/core/server/transactions/import/xlsx';
+ import { amountToInteger } from '@actual-app/core/shared/util';
+ import { useQueryClient } from '@tanstack/react-query';
+ 
+@@ -56,6 +60,7 @@ import {
+   parseDate,
+   stripCsvImportTransaction,
+ } from './utils';
++import { XlsxOptions } from './XlsxOptions';
+ 
+ function CheckboxToggle({
+   id,
+@@ -182,6 +187,9 @@ const parseOptionKeys = [
+   'skipStartLines',
+   'skipEndLines',
+   'importNotes',
++  'worksheet',
++  'headerRow',
++  'detectHeader',
+ ] satisfies Array<keyof ParseFileOptions>;
+ 
+ function shouldPreserveImportSettingsForParse(
+@@ -191,11 +199,11 @@ function shouldPreserveImportSettingsForParse(
+   options: ParseFileOptions,
+ ) {
+   return (
+-    fileType === 'csv' &&
++    isTabularFile(fileType) &&
+     lastParse?.filename === filename &&
+     lastParse.fileType === fileType &&
+     parseOptionKeys.every(key =>
+-      key === 'skipEndLines'
++      key === 'skipEndLines' && fileType === 'csv'
+         ? lastParse.options[key] !== options[key]
+         : lastParse.options[key] === options[key],
+     )
+@@ -222,11 +230,20 @@ export function ImportTransactionsModal({
+     message: string;
+   } | null>(null);
+   const [filename, setFilename] = useState(originalFileName);
++  const [fileSelectionVersion, setFileSelectionVersion] = useState(0);
+   const [transactions, setTransactions] = useState<ImportTransaction[]>([]);
+   const [parsedTransactions, setParsedTransactions] = useState<
+     ImportTransaction[]
+   >([]);
+   const [filetype, setFileType] = useState('unknown');
++  const [xlsxOptions, setXlsxOptions] = useState<XlsxImportOptions>({
++    detectHeader: true,
++  });
++  const [xlsxMetadata, setXlsxMetadata] = useState<XlsxImportMetadata | null>(
++    null,
++  );
++  const parseRequestRef = useRef(0);
++  const previewRequestRef = useRef(0);
+   const [fieldMappings, setFieldMappings] = useState<FieldMapping | null>(null);
+   const [splitMode, setSplitMode] = useState(false);
+   const [flipAmount, setFlipAmount] = useState(false);
+@@ -259,7 +276,8 @@ export function ImportTransactionsModal({
+     prefs[`csv-out-value-${accountId}`] ?? '',
+   );
+   const [hasHeaderRow, setHasHeaderRow] = useState(
+-    String(prefs[`csv-has-header-${accountId}`]) !== 'false',
++    getFileType(originalFileName) === 'xlsx' ||
++      String(prefs[`csv-has-header-${accountId}`]) !== 'false',
+   );
+   const [fallbackMissingPayeeToMemo, setFallbackMissingPayeeToMemo] = useState(
+     String(prefs[`ofx-fallback-missing-payee-${accountId}`]) !== 'false',
+@@ -382,19 +400,26 @@ export function ImportTransactionsModal({
+       options: ParseFileOptions,
+       { preserveImportSettings = false } = {},
+     ) => {
++      const request = ++parseRequestRef.current;
++      previewRequestRef.current++;
++      setTransactions([]);
+       setLoadingState('parsing');
+ 
+       const filetype = getFileType(filename);
+       setFilename(filename);
+       setFileType(filetype);
+ 
+-      const { errors, transactions: parsedTransactions = [] } = await send(
+-        'transactions-parse-file',
+-        {
+-          filepath: filename,
+-          options,
+-        },
+-      );
++      const {
++        errors,
++        transactions: parsedTransactions = [],
++        xlsx,
++      } = await send('transactions-parse-file', {
++        filepath: filename,
++        options,
++      });
++
++      if (request !== parseRequestRef.current) return;
++      setXlsxMetadata(xlsx ?? null);
+ 
+       let index = 0;
+       const transactions = parsedTransactions.map(trans => {
+@@ -411,6 +436,7 @@ export function ImportTransactionsModal({
+ 
+       /// Do fine grained reporting between the old and new OFX importers.
+       if (errors.length > 0) {
++        setParsedTransactions([]);
+         setError({
+           parsed: true,
+           message: errors[0].message || 'Internal error',
+@@ -418,16 +444,17 @@ export function ImportTransactionsModal({
+       } else {
+         if (
+           !preserveImportSettings &&
+-          (filetype === 'csv' || filetype === 'qif')
++          (isTabularFile(filetype) || filetype === 'qif')
+         ) {
+           const flipAmount =
+             String(prefs[`flip-amount-${accountId}-${filetype}`]) === 'true';
+           setFlipAmount(flipAmount);
+         }
+ 
+-        if (filetype === 'csv') {
++        if (isTabularFile(filetype)) {
+           if (!preserveImportSettings) {
+-            let mappings = prefs[`csv-mappings-${accountId}`];
++            let mappings =
++              filetype === 'xlsx' ? null : prefs[`csv-mappings-${accountId}`];
+             mappings = mappings
+               ? JSON.parse(mappings)
+               : getInitialMappings(transactions);
+@@ -478,8 +505,9 @@ export function ImportTransactionsModal({
+   }
+ 
+   useEffect(() => {
+-    const fileType = getFileType(originalFileName);
++    const fileType = getFileType(filename);
+     const parseOptions = getParseOptions(fileType, {
++      ...xlsxOptions,
+       delimiter,
+       encoding: csvEncoding,
+       hasHeaderRow,
+@@ -497,22 +525,24 @@ export function ImportTransactionsModal({
+     const lastParse = lastParseRef.current;
+     const shouldPreserveImportSettings = shouldPreserveImportSettingsForParse(
+       lastParse,
+-      originalFileName,
++      filename,
+       fileType,
+       parseOptions,
+     );
+ 
+     lastParseRef.current = {
+-      filename: originalFileName,
++      filename,
+       fileType,
+       options: parseOptions,
+     };
+ 
+-    void parse(originalFileName, parseOptions, {
++    void parse(filename, parseOptions, {
+       preserveImportSettings: shouldPreserveImportSettings,
+     });
+   }, [
+-    originalFileName,
++    filename,
++    fileSelectionVersion,
++    xlsxOptions,
+     delimiter,
+     csvEncoding,
+     hasHeaderRow,
+@@ -557,29 +587,18 @@ export function ImportTransactionsModal({
+       filters: [
+         {
+           name: 'Financial Files',
+-          extensions: ['qif', 'ofx', 'qfx', 'csv', 'tsv', 'xml'],
++          extensions: ['qif', 'ofx', 'qfx', 'csv', 'tsv', 'xml', 'xlsx'],
+         },
+       ],
+     });
+ 
+-    const fileType = getFileType(res[0]);
+-    const parseOptions = getParseOptions(fileType, {
+-      delimiter,
+-      encoding: csvEncoding,
+-      hasHeaderRow,
+-      skipStartLines,
+-      skipEndLines,
+-      fallbackMissingPayeeToMemo,
+-      importNotes,
+-      swapPayeeAndMemo: getSwapOption(
+-        fileType,
+-        ofxSwapPayeeAndMemo,
+-        qifSwapPayeeAndMemo,
+-        camtSwapPayeeAndMemo,
+-      ),
+-    });
+-
+-    void parse(res[0], parseOptions);
++    if (!res?.[0]) return;
++    if (getFileType(res[0]) === 'xlsx') setHasHeaderRow(true);
++    setXlsxOptions({ detectHeader: true });
++    setXlsxMetadata(null);
++    lastParseRef.current = null;
++    setFilename(res[0]);
++    setFileSelectionVersion(version => version + 1);
+   }
+ 
+   function onUpdateFields(field, name) {
+@@ -756,7 +775,7 @@ export function ImportTransactionsModal({
+       savePrefs({ [`csv-out-value-${accountId}`]: String(outValue) });
+     }
+ 
+-    if (filetype === 'csv' || filetype === 'qif') {
++    if (isTabularFile(filetype) || filetype === 'qif') {
+       savePrefs({
+         [`flip-amount-${accountId}-${filetype}`]: String(flipAmount),
+         [`import-notes-${accountId}-${filetype}`]: String(importNotes),
+@@ -805,6 +824,7 @@ export function ImportTransactionsModal({
+   const importPreviewTransactions = useImportPreviewTransactionsMutation();
+ 
+   const onImportPreview = useEffectEvent(async () => {
++    const request = ++previewRequestRef.current;
+     // Filter by start date before preview and deduplication
+     const isPreParsed = isOfxFile(filetype) || isCamtFile(filetype);
+     const filteredTransactions = filterByStartDate(
+@@ -828,6 +848,8 @@ export function ImportTransactionsModal({
+       multiplierAmount,
+     );
+ 
++    if (request !== previewRequestRef.current) return;
++
+     // Retreive the transactions that would be updated (along with the existing trx)
+     importPreviewTransactions.mutate(
+       {
+@@ -837,6 +859,7 @@ export function ImportTransactionsModal({
+       },
+       {
+         onSuccess: previewTrx => {
++          if (request !== previewRequestRef.current) return;
+           const matchedUpdateMap = previewTrx.reduce((map, entry) => {
+             // @ts-expect-error - entry.transaction might not have trx_id property
+             map[entry.transaction.trx_id] = entry;
+@@ -890,13 +913,15 @@ export function ImportTransactionsModal({
+ 
+   useEffect(() => {
+     if (parsedTransactions.length === 0 || loadingState === 'parsing') {
++      previewRequestRef.current++;
++      setTransactions([]);
+       return;
+     }
+ 
+     void onImportPreview();
+   }, [
+     loadingState,
+-    parsedTransactions.length,
++    parsedTransactions,
+     startDate,
+     fieldMappings,
+     parseDateFormat,
+@@ -999,7 +1024,7 @@ export function ImportTransactionsModal({
+                     <Transaction
+                       transaction={item}
+                       index={index}
+-                      showParsed={filetype === 'csv' || filetype === 'qif'}
++                      showParsed={isTabularFile(filetype) || filetype === 'qif'}
+                       parseDateFormat={parseDateFormat}
+                       dateFormat={dateFormat}
+                       fieldMappings={fieldMappings}
+@@ -1069,11 +1094,20 @@ export function ImportTransactionsModal({
+             )}
+           </View>
+ 
+-          {filetype === 'csv' && (
++          {filetype === 'xlsx' && (
++            <XlsxOptions
++              metadata={xlsxMetadata}
++              options={xlsxOptions}
++              onChange={setXlsxOptions}
++            />
++          )}
++
++          {isTabularFile(filetype) && (
+             <View style={{ marginTop: 10 }}>
+               <FieldMappings
+                 transactions={transactions}
+                 onChange={onUpdateFields}
++                title={filetype === 'xlsx' ? t('XLSX FIELDS') : undefined}
+                 mappings={fieldMappings || undefined}
+                 splitMode={splitMode}
+                 inOutMode={inOutMode}
+@@ -1101,7 +1135,7 @@ export function ImportTransactionsModal({
+             </>
+           )}
+ 
+-          {filetype !== 'csv' && (
++          {!isTabularFile(filetype) && (
+             <CheckboxToggle
+               id="import_notes"
+               checked={importNotes}
+@@ -1152,7 +1186,7 @@ export function ImportTransactionsModal({
+           )}
+ 
+           {/*Import Options */}
+-          {(filetype === 'qif' || filetype === 'csv') && (
++          {(filetype === 'qif' || isTabularFile(filetype)) && (
+             <View style={{ marginTop: 10 }}>
+               <SpaceBetween
+                 gap={5}
+@@ -1160,7 +1194,7 @@ export function ImportTransactionsModal({
+               >
+                 {/* Date Format */}
+                 <View>
+-                  {(filetype === 'qif' || filetype === 'csv') && (
++                  {(filetype === 'qif' || isTabularFile(filetype)) && (
+                     <DateFormatSelect
+                       transactions={transactions}
+                       fieldMappings={fieldMappings || undefined}
+@@ -1172,115 +1206,133 @@ export function ImportTransactionsModal({
+                   )}
+                 </View>
+ 
++                {filetype === 'xlsx' && (
++                  <CheckboxToggle
++                    id="xlsx-has-header"
++                    checked={hasHeaderRow}
++                    onChange={setHasHeaderRow}
++                  >
++                    <Trans>First row contains column names</Trans>
++                  </CheckboxToggle>
++                )}
++
+                 {/* CSV Options */}
+-                {filetype === 'csv' && (
++                {isTabularFile(filetype) && (
+                   <View style={{ marginLeft: 10, gap: 5 }}>
+-                    <SectionLabel title={t('CSV OPTIONS')} />
+-                    <label
+-                      htmlFor="csv-delimiter-select"
+-                      style={{
+-                        display: 'flex',
+-                        flexDirection: 'row',
+-                        gap: 5,
+-                        alignItems: 'baseline',
+-                      }}
+-                    >
+-                      <Trans>Delimiter:</Trans>
+-                      <Select
+-                        id="csv-delimiter-select"
+-                        options={[
+-                          [',', ','],
+-                          [';', ';'],
+-                          ['|', '|'],
+-                          ['\t', 'tab'],
+-                          ['~', '~'],
+-                        ]}
+-                        value={delimiter}
+-                        onChange={value => {
+-                          setDelimiter(value);
+-                        }}
+-                        style={{ width: 50 }}
+-                      />
+-                    </label>
+-                    <label
+-                      htmlFor="csv-encoding-select"
+-                      style={{
+-                        display: 'flex',
+-                        flexDirection: 'row',
+-                        gap: 5,
+-                        alignItems: 'baseline',
+-                      }}
+-                    >
+-                      <Trans>Encoding:</Trans>
+-                      <Select
+-                        id="csv-encoding-select"
+-                        options={[
+-                          ['auto', t('Auto (detect)')],
+-                          ['utf-8', t('UTF-8')],
+-                          ['utf-16le', t('UTF-16 LE')],
+-                          ['utf-16be', t('UTF-16 BE')],
+-                          ['windows-1252', t('Windows-1252')],
+-                          ['windows-1250', t('Windows-1250')],
+-                          ['iso-8859-2', t('ISO-8859-2')],
+-                        ]}
+-                        value={csvEncoding}
+-                        onChange={value => {
+-                          setCsvEncoding(value);
+-                        }}
+-                        style={{ width: 130 }}
+-                      />
+-                    </label>
+-                    <label
+-                      htmlFor="csv-skip-start-lines"
+-                      style={{
+-                        display: 'flex',
+-                        flexDirection: 'row',
+-                        gap: 5,
+-                        alignItems: 'baseline',
+-                      }}
+-                    >
+-                      <Trans>Skip start lines:</Trans>
+-                      <Input
+-                        id="csv-skip-start-lines"
+-                        type="number"
+-                        value={skipStartLines}
+-                        min="0"
+-                        step="1"
+-                        onChangeValue={value => {
+-                          setSkipStartLines(Math.abs(parseInt(value, 10) || 0));
+-                        }}
+-                        style={{ width: 50 }}
+-                      />
+-                    </label>
+-                    <label
+-                      htmlFor="csv-skip-end-lines"
+-                      style={{
+-                        display: 'flex',
+-                        flexDirection: 'row',
+-                        gap: 5,
+-                        alignItems: 'baseline',
+-                      }}
+-                    >
+-                      <Trans>Skip end lines:</Trans>
+-                      <Input
+-                        id="csv-skip-end-lines"
+-                        type="number"
+-                        value={skipEndLines}
+-                        min="0"
+-                        step="1"
+-                        onChangeValue={value => {
+-                          setSkipEndLines(Math.abs(parseInt(value, 10) || 0));
+-                        }}
+-                        style={{ width: 50 }}
+-                      />
+-                    </label>
+-                    <CheckboxToggle
+-                      id="form_has_header"
+-                      checked={hasHeaderRow}
+-                      onChange={setHasHeaderRow}
+-                    >
+-                      <Trans>File has header row</Trans>
+-                    </CheckboxToggle>
++                    {filetype === 'csv' && (
++                      <>
++                        <SectionLabel title={t('CSV OPTIONS')} />
++                        <label
++                          htmlFor="csv-delimiter-select"
++                          style={{
++                            display: 'flex',
++                            flexDirection: 'row',
++                            gap: 5,
++                            alignItems: 'baseline',
++                          }}
++                        >
++                          <Trans>Delimiter:</Trans>
++                          <Select
++                            id="csv-delimiter-select"
++                            options={[
++                              [',', ','],
++                              [';', ';'],
++                              ['|', '|'],
++                              ['\t', 'tab'],
++                              ['~', '~'],
++                            ]}
++                            value={delimiter}
++                            onChange={value => {
++                              setDelimiter(value);
++                            }}
++                            style={{ width: 50 }}
++                          />
++                        </label>
++                        <label
++                          htmlFor="csv-encoding-select"
++                          style={{
++                            display: 'flex',
++                            flexDirection: 'row',
++                            gap: 5,
++                            alignItems: 'baseline',
++                          }}
++                        >
++                          <Trans>Encoding:</Trans>
++                          <Select
++                            id="csv-encoding-select"
++                            options={[
++                              ['auto', t('Auto (detect)')],
++                              ['utf-8', t('UTF-8')],
++                              ['utf-16le', t('UTF-16 LE')],
++                              ['utf-16be', t('UTF-16 BE')],
++                              ['windows-1252', t('Windows-1252')],
++                              ['windows-1250', t('Windows-1250')],
++                              ['iso-8859-2', t('ISO-8859-2')],
++                            ]}
++                            value={csvEncoding}
++                            onChange={value => {
++                              setCsvEncoding(value);
++                            }}
++                            style={{ width: 130 }}
++                          />
++                        </label>
++                        <label
++                          htmlFor="csv-skip-start-lines"
++                          style={{
++                            display: 'flex',
++                            flexDirection: 'row',
++                            gap: 5,
++                            alignItems: 'baseline',
++                          }}
++                        >
++                          <Trans>Skip start lines:</Trans>
++                          <Input
++                            id="csv-skip-start-lines"
++                            type="number"
++                            value={skipStartLines}
++                            min="0"
++                            step="1"
++                            onChangeValue={value => {
++                              setSkipStartLines(
++                                Math.abs(parseInt(value, 10) || 0),
++                              );
++                            }}
++                            style={{ width: 50 }}
++                          />
++                        </label>
++                        <label
++                          htmlFor="csv-skip-end-lines"
++                          style={{
++                            display: 'flex',
++                            flexDirection: 'row',
++                            gap: 5,
++                            alignItems: 'baseline',
++                          }}
++                        >
++                          <Trans>Skip end lines:</Trans>
++                          <Input
++                            id="csv-skip-end-lines"
++                            type="number"
++                            value={skipEndLines}
++                            min="0"
++                            step="1"
++                            onChangeValue={value => {
++                              setSkipEndLines(
++                                Math.abs(parseInt(value, 10) || 0),
++                              );
++                            }}
++                            style={{ width: 50 }}
++                          />
++                        </label>
++                        <CheckboxToggle
++                          id="form_has_header"
++                          checked={hasHeaderRow}
++                          onChange={setHasHeaderRow}
++                        >
++                          <Trans>File has header row</Trans>
++                        </CheckboxToggle>
++                      </>
++                    )}
+                     <CheckboxToggle
+                       id="clear_on_import"
+                       checked={clearOnImport}
+@@ -1327,7 +1379,7 @@ export function ImportTransactionsModal({
+                     }}
+                     onChangeAmount={onMultiplierChange}
+                   />
+-                  {filetype === 'csv' && (
++                  {isTabularFile(filetype) && (
+                     <>
+                       <LabeledCheckbox
+                         id="form_split"
+@@ -1396,6 +1448,22 @@ export function ImportTransactionsModal({
+ }
+ 
+ function getParseOptions(fileType: string, options: ParseFileOptions = {}) {
++  if (fileType === 'xlsx') {
++    const {
++      worksheet,
++      headerRow,
++      detectHeader,
++      requiredColumns,
++      hasHeaderRow,
++    } = options;
++    return {
++      worksheet,
++      headerRow,
++      detectHeader,
++      requiredColumns,
++      hasHeaderRow,
++    };
++  }
+   if (fileType === 'csv') {
+     const { delimiter, encoding, hasHeaderRow, skipStartLines, skipEndLines } =
+       options;
+@@ -1446,3 +1514,7 @@ function isOfxFile(fileType: string) {
+ function isCamtFile(fileType: string) {
+   return fileType === 'xml';
+ }
++
++function isTabularFile(fileType: string) {
++  return fileType === 'csv' || fileType === 'xlsx';
++}
+diff --git a/packages/desktop-client/src/components/modals/ImportTransactionsModal/XlsxOptions.tsx b/packages/desktop-client/src/components/modals/ImportTransactionsModal/XlsxOptions.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..5cc478f6da7630e2049429c13d32f370af211f0c
+--- /dev/null
++++ b/packages/desktop-client/src/components/modals/ImportTransactionsModal/XlsxOptions.tsx
+@@ -0,0 +1,120 @@
++import { Trans } from 'react-i18next';
++
++import { Input } from '@actual-app/components/input';
++import { Select } from '@actual-app/components/select';
++import { Text } from '@actual-app/components/text';
++import { View } from '@actual-app/components/view';
++import type {
++  XlsxImportMetadata,
++  XlsxImportOptions,
++} from '@actual-app/core/server/transactions/import/xlsx';
++
++import { LabeledCheckbox } from '#components/forms/LabeledCheckbox';
++
++type XlsxOptionsProps = {
++  metadata: XlsxImportMetadata | null;
++  options: XlsxImportOptions;
++  onChange: (options: XlsxImportOptions) => void;
++};
++
++export function XlsxOptions({ metadata, options, onChange }: XlsxOptionsProps) {
++  return (
++    <View style={{ gap: 8, marginTop: 10 }}>
++      {metadata && (
++        <label htmlFor="xlsx-worksheet">
++          <Trans>Worksheet:</Trans>{' '}
++          <Select
++            id="xlsx-worksheet"
++            value={metadata.worksheet}
++            options={metadata.worksheets.map(name => [name, name])}
++            onChange={worksheet => {
++              if (worksheet !== metadata.worksheet) {
++                onChange({ worksheet, detectHeader: options.detectHeader });
++              }
++            }}
++          />
++        </label>
++      )}
++      <LabeledCheckbox
++        id="xlsx-detect-header"
++        checked={options.detectHeader !== false}
++        onChange={() =>
++          onChange({
++            ...options,
++            detectHeader: options.detectHeader === false,
++            headerRow: undefined,
++          })
++        }
++      >
++        <Trans>Detect header and trim rows above</Trans>
++      </LabeledCheckbox>
++      <label htmlFor="xlsx-header-row">
++        <Trans>Header row:</Trans>{' '}
++        <Input
++          key={`${options.worksheet ?? ''}:${options.headerRow ?? ''}:${options.detectHeader ?? true}`}
++          id="xlsx-header-row"
++          type="number"
++          min={1}
++          defaultValue={
++            options.headerRow === undefined ? '' : String(options.headerRow)
++          }
++          placeholder={metadata ? String(metadata.headerRow) : '1'}
++          onUpdate={(value, event) => {
++            const headerRow = value === '' ? undefined : Number(value);
++            if (
++              headerRow !== undefined &&
++              (!Number.isInteger(headerRow) || headerRow < 1)
++            ) {
++              event.currentTarget.value =
++                options.headerRow === undefined
++                  ? ''
++                  : String(options.headerRow);
++              return;
++            }
++            if (headerRow !== options.headerRow) {
++              onChange({ ...options, headerRow });
++            }
++          }}
++          onEnter={(_value, event) => event.currentTarget.blur()}
++          style={{ width: 80 }}
++        />
++      </label>
++      {metadata && (
++        <>
++          <fieldset style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
++            <legend style={{ padding: 0, marginBottom: 8 }}>
++              <Trans>Select columns that must have a value:</Trans>
++            </legend>
++            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
++              {metadata.columns.map((column, index) => (
++                <LabeledCheckbox
++                  key={column}
++                  id={`xlsx-required-${index}`}
++                  checked={options.requiredColumns?.includes(index) ?? false}
++                  onChange={() =>
++                    onChange({
++                      ...options,
++                      requiredColumns: options.requiredColumns?.includes(index)
++                        ? options.requiredColumns.filter(
++                            value => value !== index,
++                          )
++                        : [...(options.requiredColumns ?? []), index],
++                    })
++                  }
++                >
++                  {column}
++                </LabeledCheckbox>
++              ))}
++            </View>
++          </fieldset>
++          <Text>
++            <Trans>
++              Rows excluded for missing values:{' '}
++              {{ count: metadata.excludedRows }}
++            </Trans>
++          </Text>
++        </>
++      )}
++    </View>
++  );
++}
+diff --git a/packages/loot-core/package.json b/packages/loot-core/package.json
+index 22fc7e48f5a02583ea46966c1b9371f78a3d5109..ab89e7638a1cf1cb2b6a89e7501225902015dfa0 100644
+--- a/packages/loot-core/package.json
++++ b/packages/loot-core/package.json
+@@ -211,6 +211,7 @@
+     "lru-cache": "^11.5.3",
+     "mitt": "^3.0.1",
+     "uuid": "^14.0.3",
++    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+     "xml2js": "^0.6.2"
+   },
+   "devDependencies": {
+diff --git a/packages/loot-core/src/server/transactions/import/parse-file.test.ts b/packages/loot-core/src/server/transactions/import/parse-file.test.ts
+index bd5aca8f9641803512bf4d542584c8590d6342cc..142fb3dd0e83a71811aa0246fe6057862d826f68 100644
+--- a/packages/loot-core/src/server/transactions/import/parse-file.test.ts
++++ b/packages/loot-core/src/server/transactions/import/parse-file.test.ts
+@@ -1,5 +1,10 @@
+ // @ts-strict-ignore
++import { mkdtemp, rm, writeFile } from 'node:fs/promises';
++import { tmpdir } from 'node:os';
++import { join } from 'node:path';
++
+ import * as d from 'date-fns';
++import { utils, write } from 'xlsx';
+ 
+ import { reconcileTransactions } from '#server/accounts/sync';
+ import * as db from '#server/db';
+@@ -399,3 +404,118 @@ describe('File import', () => {
+     ]);
+   });
+ });
++
++describe('XLSX file import', () => {
++  let directory: string;
++
++  beforeEach(async () => {
++    directory = await mkdtemp(join(tmpdir(), 'actual-xlsx-'));
++  });
++
++  afterEach(async () => {
++    await rm(directory, { recursive: true, force: true });
++  });
++
++  it('passes worksheet and required-column options through the shared parser', async () => {
++    const workbook = utils.book_new();
++    utils.book_append_sheet(
++      workbook,
++      utils.aoa_to_sheet([['Report']]),
++      'Summary',
++    );
++    utils.book_append_sheet(
++      workbook,
++      utils.aoa_to_sheet([
++        ['Report'],
++        ['Date', 'Amount'],
++        ['2026-10-01', 0],
++        ['2026-10-02', null],
++      ]),
++      'Transactions',
++    );
++    const filepath = join(directory, 'transactions.XLSX');
++    await writeFile(
++      filepath,
++      write(workbook, { type: 'buffer', bookType: 'xlsx' }),
++    );
++
++    const result = await parseFile(filepath, {
++      worksheet: 'Transactions',
++      headerRow: 2,
++      requiredColumns: [1],
++    });
++
++    expect(result.errors).toEqual([]);
++    expect(result.transactions).toEqual([{ Date: '2026-10-01', Amount: '0' }]);
++    expect(result.xlsx).toEqual({
++      worksheets: ['Summary', 'Transactions'],
++      worksheet: 'Transactions',
++      headerRow: 2,
++      columns: ['Date', 'Amount'],
++      excludedRows: 1,
++    });
++  });
++
++  it.each(['oversized', 'error cell'])(
++    'keeps worksheets selectable after an %s first sheet fails',
++    async failure => {
++      const workbook = utils.book_new();
++      const summary = utils.aoa_to_sheet(
++        failure === 'oversized'
++          ? [Array(257).fill('Heading')]
++          : [
++              ['Date', 'Amount'],
++              ['2026-10-01', 1],
++            ],
++      );
++      if (failure === 'error cell') {
++        summary.B2 = { t: 'e', v: 7 };
++      }
++      utils.book_append_sheet(workbook, summary, 'Summary');
++      utils.book_append_sheet(
++        workbook,
++        utils.aoa_to_sheet([
++          ['Date', 'Amount'],
++          ['2026-10-01', -5],
++        ]),
++        'Transactions',
++      );
++      const filepath = join(directory, 'transactions.xlsx');
++      await writeFile(
++        filepath,
++        write(workbook, { type: 'buffer', bookType: 'xlsx' }),
++      );
++
++      const failed = await parseFile(filepath);
++      expect(failed.errors).toHaveLength(1);
++      expect(failed.transactions).toEqual([]);
++      expect(failed.xlsx).toMatchObject({
++        worksheet: 'Summary',
++        worksheets: ['Summary', 'Transactions'],
++      });
++
++      const recovered = await parseFile(filepath, {
++        worksheet: 'Transactions',
++      });
++      expect(recovered.errors).toEqual([]);
++      expect(recovered.transactions).toEqual([
++        { Date: '2026-10-01', Amount: '-5' },
++      ]);
++    },
++  );
++
++  it('returns parser failures using the shared file-import error result', async () => {
++    const filepath = join(directory, 'invalid.xlsx');
++    await writeFile(filepath, 'invalid workbook');
++
++    expect(await parseFile(filepath)).toEqual({
++      errors: [
++        {
++          message: 'Choose an unencrypted XLSX workbook.',
++          internal: 'Choose an unencrypted XLSX workbook.',
++        },
++      ],
++      transactions: [],
++    });
++  });
++});
+diff --git a/packages/loot-core/src/server/transactions/import/parse-file.ts b/packages/loot-core/src/server/transactions/import/parse-file.ts
+index ef7a63f8d5152ebb23028aeece545f5a347297d1..184b9cd865394c936d6f26e3678f78be6eb76fd1 100644
+--- a/packages/loot-core/src/server/transactions/import/parse-file.ts
++++ b/packages/loot-core/src/server/transactions/import/parse-file.ts
+@@ -7,6 +7,7 @@ import { looselyParseAmount } from '#shared/util';
+ 
+ import { ofx2json } from './ofx2json';
+ import { qif2json } from './qif2json';
++import type { XlsxImportMetadata, XlsxImportOptions } from './xlsx';
+ import { xmlCAMT2json } from './xmlcamt2json';
+ 
+ /**
+@@ -87,10 +88,11 @@ type Transaction = StructuredTransaction | CsvTransaction;
+ type ParseError = { message: string; internal: string };
+ export type ParseFileResult = {
+   errors: ParseError[];
++  xlsx?: XlsxImportMetadata;
+   transactions?: Transaction[];
+ };
+ 
+-export type ParseFileOptions = {
++export type ParseFileOptions = XlsxImportOptions & {
+   hasHeaderRow?: boolean;
+   delimiter?: string;
+   fallbackMissingPayeeToMemo?: boolean;
+@@ -112,6 +114,8 @@ export async function parseFile(
+     const ext = m[0];
+ 
+     switch (ext.toLowerCase()) {
++      case '.xlsx':
++        return parseXLSX(filepath, options);
+       case '.qif':
+         return parseQIF(filepath, options);
+       case '.csv':
+@@ -133,6 +137,21 @@ export async function parseFile(
+   return { errors, transactions: [] };
+ }
+ 
++async function parseXLSX(
++  filepath: string,
++  options: ParseFileOptions,
++): Promise<ParseFileResult> {
++  try {
++    const { parseXlsx } = await import('./xlsx');
++    const bytes = await fs.readFile(filepath, 'binary');
++    return { errors: [], ...parseXlsx(bytes, options) };
++  } catch (error) {
++    const message =
++      error instanceof Error ? error.message : 'Invalid XLSX file';
++    return { errors: [{ message, internal: message }], transactions: [] };
++  }
++}
++
+ async function parseCSV(
+   filepath: string,
+   options: ParseFileOptions,
+diff --git a/packages/loot-core/src/server/transactions/import/xlsx.test.ts b/packages/loot-core/src/server/transactions/import/xlsx.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..deec5e296e70c6563a4ac3d5a45ade3952dd650e
+--- /dev/null
++++ b/packages/loot-core/src/server/transactions/import/xlsx.test.ts
+@@ -0,0 +1,211 @@
++import { unzipSync, zipSync } from 'fflate';
++import { utils, write } from 'xlsx';
++
++import { parseXlsx } from './xlsx';
++
++function zipWorkbook(entries: Record<string, Uint8Array>) {
++  return zipSync(entries, { mtime: new Date('2026-01-01') });
++}
++
++function workbookBytes(rows: unknown[][], extraSheet = true, date1904 = false) {
++  const workbook = utils.book_new();
++  utils.book_append_sheet(workbook, utils.aoa_to_sheet(rows), 'Transactions');
++  if (extraSheet) {
++    utils.book_append_sheet(
++      workbook,
++      utils.aoa_to_sheet([
++        ['Date', 'Amount'],
++        ['2026-10-02', 12],
++      ]),
++      'Savings',
++    );
++  }
++  workbook.Workbook = { WBProps: { date1904 } };
++  return new Uint8Array(write(workbook, { type: 'array', bookType: 'xlsx' }));
++}
++
++describe('native XLSX import', () => {
++  it('detects a header after report titles and preserves amounts, Unicode and zero', () => {
++    const result = parseXlsx(
++      workbookBytes([
++        ['Bank statement'],
++        [],
++        ['Date', 'Payee', 'Amount'],
++        ['2026-10-01', 'Köp, "mat"', -1234.56],
++        ['2026-10-02', 'Refund', 0],
++      ]),
++    );
++    expect(result.xlsx.headerRow).toBe(3);
++    expect(result.xlsx.worksheets).toEqual(['Transactions', 'Savings']);
++    expect(result.transactions).toEqual([
++      { Date: '2026-10-01', Payee: 'Köp, "mat"', Amount: '-1234.56' },
++      { Date: '2026-10-02', Payee: 'Refund', Amount: '0' },
++    ]);
++  });
++
++  it('selects another sheet and accepts an explicit header row', () => {
++    const bytes = workbookBytes([
++      ['Title'],
++      ['Date', 'Amount'],
++      ['2026-10-01', -1],
++    ]);
++    expect(parseXlsx(bytes, { worksheet: 'Savings' }).transactions).toEqual([
++      { Date: '2026-10-02', Amount: '12' },
++    ]);
++    expect(parseXlsx(bytes, { headerRow: 2 }).xlsx.headerRow).toBe(2);
++    expect(
++      parseXlsx(bytes, { worksheet: 'Missing' }).errors[0].message,
++    ).toContain('valid worksheet');
++    expect(parseXlsx(bytes, { headerRow: 0 }).errors[0].message).toContain(
++      'outside',
++    );
++  });
++
++  it('filters required cells, preserves zero and ignores entirely empty rows', () => {
++    const result = parseXlsx(
++      workbookBytes([
++        ['Date', 'Payee', 'Amount'],
++        ['2026-10-01', '', 0],
++        ['2026-10-02', 'Shop', null],
++        [],
++        ['2026-10-03', 'Shop', -5],
++      ]),
++      { requiredColumns: [0, 2] },
++    );
++    expect(result.transactions).toHaveLength(2);
++    expect(result.transactions[0].Amount).toBe('0');
++    expect(result.xlsx.excludedRows).toBe(1);
++  });
++
++  it('keeps duplicate and blank headers without losing columns', () => {
++    const result = parseXlsx(
++      workbookBytes([
++        ['Amount', 'Amount', ''],
++        [1, 2, 3],
++      ]),
++      { headerRow: 1 },
++    );
++    expect(result.transactions).toEqual([
++      { Amount: '1', 'Amount (2)': '2', 'Column 3': '3' },
++    ]);
++  });
++
++  it('supports a sheet without a header', () => {
++    expect(
++      parseXlsx(
++        workbookBytes([
++          ['2026-10-01', -1],
++          ['2026-10-02', -2],
++        ]),
++        { hasHeaderRow: false },
++      ).transactions,
++    ).toEqual([
++      { '0': '2026-10-01', '1': '-1' },
++      { '0': '2026-10-02', '1': '-2' },
++    ]);
++  });
++
++  it.each([false, true])(
++    'converts Excel dates with date1904=%s without timezone shifts',
++    date1904 => {
++      const workbook = utils.book_new();
++      const sheet = utils.aoa_to_sheet([
++        ['Date', 'Amount'],
++        [date1904 ? 44834 : 46296, -12.345],
++      ]);
++      sheet.A2.z = 'm/d/yy';
++      sheet.B2.z = '$#,##0.00';
++      utils.book_append_sheet(workbook, sheet, 'Transactions');
++      workbook.Workbook = { WBProps: { date1904 } };
++      const result = parseXlsx(
++        new Uint8Array(write(workbook, { type: 'array', bookType: 'xlsx' })),
++      );
++      expect(result.transactions[0]).toEqual({
++        Date: '2026-10-01',
++        Amount: '-12.345',
++      });
++    },
++  );
++
++  it('uses cached formula results and rejects error cells', () => {
++    const workbook = utils.book_new();
++    const sheet = utils.aoa_to_sheet([
++      ['Date', 'Amount'],
++      ['2026-10-01', 3],
++    ]);
++    sheet.B2.f = '1+2';
++    utils.book_append_sheet(workbook, sheet, 'Transactions');
++    const bytes = () =>
++      new Uint8Array(write(workbook, { type: 'array', bookType: 'xlsx' }));
++    expect(parseXlsx(bytes()).transactions[0].Amount).toBe('3');
++    sheet.B2 = { t: 'e', v: 7 };
++    const result = parseXlsx(bytes());
++    expect(result.errors[0].message).toContain('B2 contains an error');
++    expect(result.transactions).toEqual([]);
++    expect(result.xlsx.worksheets).toEqual(['Transactions']);
++  });
++
++  it('accepts compressed workbooks', () => {
++    const bytes = zipWorkbook(unzipSync(workbookBytes([['Amount'], [3]])));
++    expect(parseXlsx(bytes).transactions).toEqual([{ Amount: '3' }]);
++  });
++
++  it('enforces entry and cumulative expanded limits across unused resources', () => {
++    const entries = unzipSync(workbookBytes([['Amount'], [3]]));
++    expect(() =>
++      parseXlsx(
++        zipWorkbook({
++          ...entries,
++          'unused.bin': new Uint8Array(25 * 1024 * 1024 + 1),
++        }),
++      ),
++    ).toThrow('expanded size');
++    expect(() =>
++      parseXlsx(
++        zipWorkbook({
++          ...entries,
++          'unused1.bin': new Uint8Array(20 * 1024 * 1024),
++          'unused2.bin': new Uint8Array(20 * 1024 * 1024),
++          'unused3.bin': new Uint8Array(20 * 1024 * 1024),
++        }),
++      ),
++    ).toThrow('expanded size');
++  });
++
++  it('rejects forged sizes even when local and central headers agree', () => {
++    const bytes = zipWorkbook({ 'unused.bin': new Uint8Array(1024 * 1024) });
++    const view = new DataView(bytes.buffer);
++    const directory = view.getUint32(bytes.length - 6, true);
++    view.setUint32(22, 1, true);
++    view.setUint32(directory + 24, 1, true);
++    expect(() => parseXlsx(bytes)).toThrow('Invalid XLSX ZIP sizes');
++  });
++
++  it('rejects inconsistent headers and incomplete directories', () => {
++    const bytes = workbookBytes([['Amount'], [3]]);
++    const view = new DataView(bytes.buffer);
++    view.setUint32(22, 1, true);
++    expect(() => parseXlsx(bytes)).toThrow('Invalid XLSX ZIP sizes');
++    const truncated = workbookBytes([['Amount'], [3]]);
++    new DataView(truncated.buffer).setUint16(truncated.length - 12, 0, true);
++    expect(() => parseXlsx(truncated)).toThrow('Invalid XLSX archive');
++  });
++
++  it('rejects malformed archives, invalid columns, oversized sheets and empty sheets', () => {
++    expect(() => parseXlsx(new Uint8Array([1, 2, 3]))).toThrow(
++      'unencrypted XLSX',
++    );
++    expect(() => parseXlsx(new Uint8Array([0x50, 0x4b, 0]))).toThrow(
++      'Invalid XLSX',
++    );
++    expect(
++      parseXlsx(workbookBytes([['Date'], ['2026-10-01']]), {
++        requiredColumns: [1],
++      }).errors[0].message,
++    ).toContain('required columns');
++    expect(
++      parseXlsx(workbookBytes([Array(257).fill('x')])).errors[0].message,
++    ).toContain('256 columns');
++    expect(parseXlsx(workbookBytes([])).transactions).toEqual([]);
++  });
++});
+diff --git a/packages/loot-core/src/server/transactions/import/xlsx.ts b/packages/loot-core/src/server/transactions/import/xlsx.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..fd2fa20e32f1e437ba6e4e89f317b94711fda2cd
+--- /dev/null
++++ b/packages/loot-core/src/server/transactions/import/xlsx.ts
+@@ -0,0 +1,405 @@
++import { Inflate } from 'fflate';
++import { read, SSF, utils } from 'xlsx';
++import type { CellObject, WorkBook, WorkSheet } from 'xlsx';
++
++export type XlsxImportOptions = {
++  worksheet?: string;
++  /** One-based worksheet row; undefined uses detection when enabled. */
++  headerRow?: number;
++  detectHeader?: boolean;
++  requiredColumns?: number[];
++};
++
++export type XlsxImportMetadata = {
++  worksheets: string[];
++  worksheet: string;
++  headerRow: number;
++  columns: string[];
++  excludedRows: number;
++};
++
++/** Parse locally into the same raw fields used by Actual's CSV mapping UI. */
++export function parseXlsx(
++  bytes: Uint8Array,
++  options: XlsxImportOptions & { hasHeaderRow?: boolean } = {},
++) {
++  if (bytes.byteLength > 25 * 1024 * 1024) {
++    throw new Error('XLSX files must be 25 MB or smaller.');
++  }
++  // Reject legacy spreadsheets and non-ZIP inputs despite a renamed extension.
++  if (bytes[0] !== 0x50 || bytes[1] !== 0x4b) {
++    throw new Error('Choose an unencrypted XLSX workbook.');
++  }
++  const workbook = read(normalizeStoredZip(bytes), {
++    type: 'array',
++    cellNF: true,
++    nodim: true,
++  });
++  const worksheet = options.worksheet ?? workbook.SheetNames[0];
++  const metadata: XlsxImportMetadata = {
++    worksheets: workbook.SheetNames,
++    worksheet: worksheet ?? '',
++    headerRow: options.headerRow ?? 1,
++    columns: [],
++    excludedRows: 0,
++  };
++  try {
++    return { errors: [], ...parseWorksheet(workbook, metadata, options) };
++  } catch (error) {
++    const message =
++      error instanceof Error ? error.message : 'Invalid worksheet';
++    return {
++      errors: [{ message, internal: message }],
++      transactions: [],
++      xlsx: metadata,
++    };
++  }
++}
++
++function parseWorksheet(
++  workbook: WorkBook,
++  metadata: XlsxImportMetadata,
++  options: XlsxImportOptions & { hasHeaderRow?: boolean },
++) {
++  const { worksheet } = metadata;
++  const sheet = worksheet && workbook.Sheets[worksheet];
++  if (!sheet || !worksheet) throw new Error('Choose a valid worksheet.');
++  if (!sheet['!ref'] || !Object.keys(sheet).some(key => !key.startsWith('!'))) {
++    return {
++      transactions: [],
++      xlsx: {
++        worksheets: workbook.SheetNames,
++        worksheet,
++        headerRow: 1,
++        columns: [],
++        excludedRows: 0,
++      },
++    };
++  }
++  const range = utils.decode_range(sheet['!ref']);
++  const hasHeader = options.hasHeaderRow !== false;
++  const header =
++    options.headerRow !== undefined
++      ? options.headerRow - 1
++      : ((hasHeader && options.detectHeader !== false
++          ? detectHeaderRow(sheet)
++          : null) ?? range.s.r);
++  if (!Number.isInteger(header) || header < range.s.r || header > range.e.r) {
++    throw new Error('Header row is outside the worksheet.');
++  }
++  const width = range.e.c - range.s.c + 1;
++  if (width > 256 || range.e.r - header + 1 > 10000 + (hasHeader ? 1 : 0)) {
++    throw new Error(
++      'Select a worksheet with at most 256 columns and 10,000 data rows.',
++    );
++  }
++  const required = options.requiredColumns ?? [];
++  if (
++    required.some(
++      column => !Number.isInteger(column) || column < 0 || column >= width,
++    )
++  ) {
++    throw new Error('Choose valid required columns.');
++  }
++  const valueAt = (row: number, column: number) => {
++    const cell: CellObject | undefined =
++      sheet[utils.encode_cell({ r: row, c: range.s.c + column })];
++    if (!cell || cell.v == null) return '';
++    if (cell.t === 'e') {
++      throw new Error(
++        `Worksheet cell ${utils.encode_cell({ r: row, c: range.s.c + column })} contains an error.`,
++      );
++    }
++    if (cell.t === 'n' && typeof cell.v === 'number') {
++      if (cell.z && SSF.is_date(cell.z)) {
++        const date = SSF.parse_date_code(cell.v, {
++          date1904: workbook.Workbook?.WBProps?.date1904,
++        });
++        if (!date) throw new Error('Invalid Excel date.');
++        return `${String(date.y).padStart(4, '0')}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
++      }
++      // Preserve the number, avoiding currency symbols and display rounding.
++      return String(cell.v);
++    }
++    return String(cell.v).trim();
++  };
++  const used = new Set<string>();
++  const columns = Array.from({ length: width }, (_, column) => {
++    const label = hasHeader
++      ? valueAt(header, column) || `Column ${column + 1}`
++      : String(column);
++    let unique = label;
++    let suffix = 2;
++    while (used.has(unique)) unique = `${label} (${suffix++})`;
++    used.add(unique);
++    return unique;
++  });
++  const transactions: Record<string, string>[] = [];
++  let excludedRows = 0;
++  for (let row = header + (hasHeader ? 1 : 0); row <= range.e.r; row++) {
++    const values = columns.map((_, column) => valueAt(row, column));
++    if (values.every(value => value === '')) continue;
++    if (required.some(column => values[column] === '')) {
++      excludedRows++;
++      continue;
++    }
++    transactions.push(
++      Object.fromEntries(columns.map((name, column) => [name, values[column]])),
++    );
++  }
++  return {
++    transactions,
++    xlsx: {
++      worksheets: workbook.SheetNames,
++      worksheet,
++      headerRow: header + 1,
++      columns,
++      excludedRows,
++    } satisfies XlsxImportMetadata,
++  };
++}
++
++// Validate every member, including sheets and resources that are not selected.
++function normalizeStoredZip(data: Uint8Array) {
++  const bytes = new Uint8Array(data);
++  const view = new DataView(bytes.buffer);
++  const endSignature = 0x06054b50;
++  const directorySignature = 0x02014b50;
++  const localSignature = 0x04034b50;
++  const dataDescriptorFlag = 0x08;
++  const encryptedFlag = 0x01;
++  const storedMethod = 0;
++  const endRecordSize = 22;
++  const directoryHeaderSize = 46;
++  const localHeaderSize = 30;
++  const maxCommentLength = 65535;
++
++  // The end record can be followed by a ZIP comment of up to 65,535 bytes.
++  let end = bytes.length - endRecordSize;
++  const minimum = Math.max(0, end - maxCommentLength);
++  for (; end >= minimum; end--) {
++    if (
++      view.getUint32(end, true) === endSignature &&
++      end + endRecordSize + view.getUint16(end + 20, true) === bytes.length
++    ) {
++      break;
++    }
++  }
++  if (end < minimum) throw new Error('Invalid XLSX archive');
++
++  const entryCount = view.getUint16(end + 10, true);
++  let directoryOffset = view.getUint32(end + 16, true);
++  const directoryStart = directoryOffset;
++  if (
++    view.getUint16(end + 4, true) !== 0 ||
++    view.getUint16(end + 6, true) !== 0 ||
++    view.getUint16(end + 8, true) !== entryCount ||
++    entryCount === 0xffff ||
++    directoryStart + view.getUint32(end + 12, true) !== end
++  ) {
++    throw new Error('Invalid XLSX archive');
++  }
++  const maxEntrySize = 25 * 1024 * 1024;
++  const maxExpandedSize = 50 * 1024 * 1024;
++  let expandedSize = 0;
++  const spans: { start: number; end: number }[] = [];
++  for (let i = 0; i < entryCount; i++) {
++    if (
++      directoryOffset + directoryHeaderSize > end ||
++      view.getUint32(directoryOffset, true) !== directorySignature
++    ) {
++      throw new Error('Invalid ZIP directory');
++    }
++
++    const flags = view.getUint16(directoryOffset + 8, true);
++    const method = view.getUint16(directoryOffset + 10, true);
++    const localOffset = view.getUint32(directoryOffset + 42, true);
++    const compressedSize = view.getUint32(directoryOffset + 20, true);
++    const originalSize = view.getUint32(directoryOffset + 24, true);
++    expandedSize += originalSize;
++    if (originalSize > maxEntrySize || expandedSize > maxExpandedSize) {
++      throw new Error('XLSX expanded size exceeds the import limit.');
++    }
++    const nameLength = view.getUint16(directoryOffset + 28, true);
++    const extraLength = view.getUint16(directoryOffset + 30, true);
++    const commentLength = view.getUint16(directoryOffset + 32, true);
++    const nextDirectory =
++      directoryOffset +
++      directoryHeaderSize +
++      nameLength +
++      extraLength +
++      commentLength;
++    if (
++      nextDirectory > end ||
++      flags & encryptedFlag ||
++      (method !== 0 && method !== 8) ||
++      view.getUint16(directoryOffset + 34, true) !== 0 ||
++      localOffset + localHeaderSize > directoryStart ||
++      view.getUint32(localOffset, true) !== localSignature ||
++      view.getUint16(localOffset + 6, true) !== flags ||
++      view.getUint16(localOffset + 8, true) !== method ||
++      view.getUint16(localOffset + 26, true) !== nameLength
++    ) {
++      throw new Error('Invalid XLSX ZIP entry');
++    }
++    const contentStart =
++      localOffset +
++      localHeaderSize +
++      nameLength +
++      view.getUint16(localOffset + 28, true);
++    const contentEnd = contentStart + compressedSize;
++    if (
++      contentEnd > directoryStart ||
++      !bytes
++        .subarray(
++          localOffset + localHeaderSize,
++          localOffset + localHeaderSize + nameLength,
++        )
++        .every(
++          (byte, index) =>
++            byte === bytes[directoryOffset + directoryHeaderSize + index],
++        )
++    ) {
++      throw new Error('Invalid XLSX ZIP entry');
++    }
++    let entryEnd = contentEnd;
++    if (flags & dataDescriptorFlag) {
++      const descriptor =
++        contentEnd +
++        (contentEnd + 4 <= directoryStart &&
++        view.getUint32(contentEnd, true) === 0x08074b50
++          ? 4
++          : 0);
++      if (
++        descriptor + 12 > directoryStart ||
++        view.getUint32(descriptor, true) !==
++          view.getUint32(directoryOffset + 16, true) ||
++        view.getUint32(descriptor + 4, true) !== compressedSize ||
++        view.getUint32(descriptor + 8, true) !== originalSize
++      ) {
++        throw new Error('Invalid XLSX ZIP descriptor');
++      }
++      entryEnd = descriptor + 12;
++    } else if (
++      view.getUint32(localOffset + 14, true) !==
++        view.getUint32(directoryOffset + 16, true) ||
++      view.getUint32(localOffset + 18, true) !== compressedSize ||
++      view.getUint32(localOffset + 22, true) !== originalSize
++    ) {
++      throw new Error('Invalid XLSX ZIP sizes');
++    }
++    spans.push({ start: localOffset, end: entryEnd });
++    // Do not trust declared sizes alone: stream in small compressed chunks so
++    // forged sizes cannot cause an unbounded allocation before being rejected.
++    let actualSize = 0;
++    if (method === 8) {
++      const inflater = new Inflate(chunk => {
++        actualSize += chunk.length;
++        if (actualSize > originalSize) {
++          throw new Error('Invalid XLSX ZIP sizes');
++        }
++      });
++      for (let offset = contentStart; offset < contentEnd; offset += 1024) {
++        const next = Math.min(offset + 1024, contentEnd);
++        inflater.push(bytes.subarray(offset, next), next === contentEnd);
++      }
++    } else {
++      actualSize = compressedSize;
++    }
++    if (actualSize !== originalSize) throw new Error('Invalid XLSX ZIP sizes');
++    const needsSizes =
++      method === storedMethod &&
++      flags & dataDescriptorFlag &&
++      !(flags & encryptedFlag);
++    if (needsSizes) {
++      if (
++        localOffset + localHeaderSize > directoryOffset ||
++        view.getUint32(localOffset, true) !== localSignature
++      ) {
++        throw new Error('Invalid ZIP entry');
++      }
++
++      // Clear the descriptor flag and copy the CRC and both sizes.
++      view.setUint16(
++        localOffset + 6,
++        view.getUint16(localOffset + 6, true) & ~dataDescriptorFlag,
++        true,
++      );
++      view.setUint32(
++        localOffset + 14,
++        view.getUint32(directoryOffset + 16, true),
++        true,
++      );
++      view.setUint32(
++        localOffset + 18,
++        view.getUint32(directoryOffset + 20, true),
++        true,
++      );
++      view.setUint32(
++        localOffset + 22,
++        view.getUint32(directoryOffset + 24, true),
++        true,
++      );
++    }
++
++    directoryOffset = nextDirectory;
++  }
++  if (directoryOffset !== end) throw new Error('Invalid XLSX ZIP directory');
++  let nextLocal = 0;
++  for (const span of spans.sort((a, b) => a.start - b.start)) {
++    if (span.start !== nextLocal) throw new Error('Invalid XLSX ZIP layout');
++    nextLocal = span.end;
++  }
++  if (nextLocal !== directoryStart) throw new Error('Invalid XLSX ZIP layout');
++  return bytes;
++}
++
++function detectHeaderRow(sheet: WorkSheet) {
++  if (!sheet?.['!ref']) return null;
++  const range = utils.decode_range(sheet['!ref']);
++  const lastColumn = Math.min(range.e.c, range.s.c + 255);
++  const cellAt = (r: number, c: number) => sheet[utils.encode_cell({ r, c })];
++  const nonempty = (cell: CellObject | undefined) =>
++    cell?.v !== undefined && cell.v !== null && String(cell.v).trim() !== '';
++  const label = (cell: CellObject | undefined) =>
++    cell?.t === 's' &&
++    /\p{L}/u.test(String(cell.v)) &&
++    !/^\d{4}[-/]\d{2}[-/]\d{2}/.test(String(cell.v));
++  const common =
++    /^(date|name|description|amount|balance|id|email|status|quantity|price|total|datum|namn|beskrivning|belopp|saldo|bokföringsdatum|transaktionsdatum|valutadatum|text|referens)$/i;
++  let best: number | null = null,
++    bestScore = 0;
++  for (let r = range.s.r; r <= Math.min(range.e.r, range.s.r + 99); r++) {
++    const columns = [];
++    for (let c = range.s.c; c <= lastColumn; c++) {
++      if (nonempty(cellAt(r, c))) columns.push(c);
++    }
++    if (columns.length < 2) continue;
++    const labels = columns.filter(c => label(cellAt(r, c)));
++    if (labels.length / columns.length < 0.8) continue;
++    const values = labels.map(c => String(cellAt(r, c).v).trim().toLowerCase());
++    if (new Set(values).size !== values.length) continue;
++    const known = values.filter(value => common.test(value)).length;
++    let aligned = 0,
++      transitions = 0;
++    for (let next = r + 1; next <= Math.min(range.e.r, r + 5); next++) {
++      const occupied = columns.filter(c => nonempty(cellAt(next, c)));
++      if (occupied.length / columns.length < 0.75) continue;
++      aligned++;
++      transitions += labels.filter(
++        c => nonempty(cellAt(next, c)) && !label(cellAt(next, c)),
++      ).length;
++    }
++    if (!aligned || (!transitions && known < 2)) continue;
++    const score =
++      columns.length * 3 +
++      Math.min(aligned, 3) +
++      (transitions / aligned) * 2 +
++      Math.min(known, 3);
++    if (score > bestScore) {
++      best = r;
++      bestScore = score;
++    }
++  }
++  return best;
++}
+diff --git a/yarn.lock b/yarn.lock
+index 97a84948ce99f2c73be8881f0acb07fa2df9aced..0522bcbd619d693677dcc6b14edf70ec279a11a0 100644
+--- a/yarn.lock
++++ b/yarn.lock
+@@ -156,6 +156,7 @@ __metadata:
+     vite: "npm:^8.3.4"
+     vite-plugin-node-polyfills: "patch:vite-plugin-node-polyfills@npm%3A0.28.0#~/.yarn/patches/vite-plugin-node-polyfills-npm-0.28.0-bac39616ee.patch"
+     vitest: "npm:^5.0.4"
++    xlsx: "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+     xml2js: "npm:^0.6.2"
+     yargs: "npm:^18.2.0"
+   languageName: unknown
+@@ -28595,6 +28596,15 @@ __metadata:
+   languageName: node
+   linkType: hard
+ 
++"xlsx@https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz":
++  version: 0.20.3
++  resolution: "xlsx@https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
++  bin:
++    xlsx: ./bin/xlsx.njs
++  checksum: 10/895c589c5f6ffc665184165b5aa5d337de0e2ee24ccd53d517d2378f3a8a7df82405b023fdcfde9f49d7de3d4ef1622cf2ef145316c9732c634a86ee313bad4f
++  languageName: node
++  linkType: hard
++
+ "xml-js@npm:^1.6.11":
+   version: 1.6.11
+   resolution: "xml-js@npm:1.6.11"
